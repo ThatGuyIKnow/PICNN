@@ -220,11 +220,18 @@ for model in models.values():
 
 # configure and instantiate the agent (visit its documentation to see all the options)
 # https://skrl.readthedocs.io/en/latest/api/agents/dqn.html#configuration-and-hyperparameters
+    
+TOTAL_TIMESTEPS = int(1e6)
+
 cfg = DQN_DEFAULT_CONFIG.copy()
-cfg["learning_starts"] = 100
+cfg["learning_starts"] = 80000
+cfg["learning_rate"] = 1e-4
+cfg["polyak"] = 1.0
+cfg["batch_size"] = 32
+cfg["polyak"] = 1.0
 cfg["exploration"]["initial_epsilon"] = 1.0
-cfg["exploration"]["final_epsilon"] = 0.1
-cfg["exploration"]["timesteps"] = 100000
+cfg["exploration"]["final_epsilon"] = 0.01
+cfg["exploration"]["timesteps"] = int(TOTAL_TIMESTEPS * 0.1)
 # logging to TensorBoard and write checkpoints (in timesteps)
 cfg["experiment"]["write_interval"] = 100
 cfg["experiment"]["checkpoint_interval"] = 5000
@@ -241,7 +248,7 @@ agent = DQN(models=models,
 
 
 # configure and instantiate the RL trainer
-cfg_trainer = {"timesteps": int(1e6), "headless": True}
+cfg_trainer = {"timesteps": TOTAL_TIMESTEPS, "headless": True}
 trainer = SequentialTrainer(cfg=cfg_trainer, env=env, agents=[agent])
 
 # start training
