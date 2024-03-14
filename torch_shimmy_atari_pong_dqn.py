@@ -246,3 +246,5 @@ trainer = SequentialTrainer(cfg=cfg_trainer, env=env, agents=[agent])
 
 # start training
 trainer.train()
+
+trainer.eval()
