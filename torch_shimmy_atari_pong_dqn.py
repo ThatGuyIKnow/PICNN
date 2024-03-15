@@ -29,10 +29,10 @@ else:
   device = torch.device("cpu")
 
 def local_loss(agent, sampled_states, sampled_actions, sampled_rewards, sampled_next_states, sampled_dones):
-    _, _, _, loss_1, loss_2 = agent.target_q_network.forward_full(sampled_states)
-    _, _, _, loss_1, loss_2 = agent.target_q_network.forward_full(sampled_next_states)
+    _, _, _, loss_1, loss_2 = agent.target_q_network.forward(sampled_states)
+    _, _, _, loss_1, loss_2 = agent.target_q_network.forward(sampled_next_states)
 
-    return loss_1 + loss_2
+    return (loss_1 + loss_2).mean()
 
 class QNetwork(DeterministicMixin, Model):
 
@@ -68,16 +68,17 @@ class QNetwork(DeterministicMixin, Model):
         feat = self.backbone(x)
         x = self.icnn(feat)
 
-        return x[0]
+        return x
         
-    def forward_full(self, inputs : torch.Tensor, targets=None, forward_pass='default'):
-        x = inputs.view(-1, 4, 84, 84) / 255.
-        feat = self.backbone(x)
-        return self.icnn(feat)
+    # def forward_full(self, inputs : torch.Tensor, targets=None, forward_pass='default'):
+    #     x = inputs.view(-1, 4, 84, 84) / 255.
+    #     x = torch.autograd.Variable(x, requires_grad=True)
+    #     feat = self.backbone(x)
+    #     return self.icnn(feat)
         
 
     def compute(self, inputs, role):
-        return self.forward(inputs["states"]), {}
+        return self.forward(inputs["states"])[0], {}
     
 # load and wrap the environment
 env = gym.make("ALE/Pong-v5")
@@ -111,6 +112,7 @@ TOTAL_TIMESTEPS = int(5e6)
 
 cfg = DQN_DEFAULT_CONFIG.copy()
 cfg["learning_starts"] = 80000
+# cfg["learning_starts"] = 8000
 cfg["learning_rate"] = 1e-4
 cfg["polyak"] = 1.0
 cfg["batch_size"] = 32
