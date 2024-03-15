@@ -11,8 +11,6 @@ from skrl.models.torch import DeterministicMixin, Model
 from skrl.trainers.torch import SequentialTrainer
 from skrl.utils import set_seed
 
-from icnn import ICNN
-
 
 # seed for reproducibility
 set_seed()  # e.g. `set_seed(42)` for fixed seed
@@ -46,31 +44,23 @@ class QNetwork(DeterministicMixin, Model):
         self.backbone = nn.Sequential(nn.Conv2d(4, 32, kernel_size=8, stride=4),
                                                 nn.LeakyReLU(),
                                                 nn.Conv2d(32, 64, kernel_size=4, stride=2),
-                                                nn.LeakyReLU()
+                                                nn.LeakyReLU(),
+                                                nn.Conv2d(64, 64, kernel_size=3, stride=1),
+                                                nn.LeakyReLU(),
+                                                nn.Flatten(),
                                             )
-        self.classifier = nn.Sequential( 
-           nn.Conv2d(64, 64, kernel_size=3, stride=1),
-           nn.LeakyReLU(),
-           nn.Flatten(),
-           nn.Linear(self.n_filters, 512),
-           nn.Linear(512, self.num_actions)
+        self.classifier = nn.Sequential(
+            nn.Linear(self.n_filters, 512),
+            nn.Linear(512, self.num_actions)
         )
-        self.icnn = ICNN(64, 64, kernel_size=3, stride=1, padding=1, classifier=self.classifier, device=device)
         
 
 
         self.correlation = nn.Parameter(F.softmax(torch.rand(size=(self.n_classes, self.n_filters)), dim=0))
 
 
-    def forward(self, inputs : torch.Tensor, targets=None, forward_pass='default'):
-        feat = self.backbone(inputs)
-        x = self.icnn(feat)
-
-        return x[0]
-        
-
     def compute(self, inputs, role):
-        return self.forward(inputs["states"].view(-1, 4, 84, 84) / 255.), {}
+        return self.forward(inputs["states"].view(-1, 4, 84, 84) / 255.)['pred_2'], {}
     
 # load and wrap the environment
 env = gym.make("ALE/Pong-v5")
@@ -115,8 +105,8 @@ cfg["exploration"]["timesteps"] = int(TOTAL_TIMESTEPS * 0.1)
 cfg["experiment"]["write_interval"] = 100
 cfg["experiment"]["checkpoint_interval"] = 5000
 cfg["experiment"]["directory"] = "runs/torch/ALE_Pong"
-cfg["experiment"]["wandb"] = True
-cfg["experiment"]["wandb_kwargs"] = {'project': 'inv_dyn'}
+# cfg["experiment"]["wandb"] = True
+# cfg["experiment"]["wandb_kwargs"] = {'project': 'inv_dyn'}
 
 agent = DQN(models=models,
             memory=memory,
