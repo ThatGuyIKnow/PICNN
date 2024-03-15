@@ -28,11 +28,11 @@ if torch.cuda.is_available():
 else:
   device = torch.device("cpu")
 
-def local_loss(agent, sampled_states, sampled_actions, sampled_rewards, sampled_next_states, sampled_dones):
-    _, _, _, loss_1, loss_2 = agent.target_q_network.forward(sampled_states)
-    _, _, _, loss_1, loss_2 = agent.target_q_network.forward(sampled_next_states)
+# def local_loss(agent, sampled_states, sampled_actions, sampled_rewards, sampled_next_states, sampled_dones):
+#     _, _, _, loss_1, loss_2 = agent.target_q_network.forward(sampled_states)
+#     _, _, _, loss_1, loss_2 = agent.target_q_network.forward(sampled_next_states)
 
-    return (loss_1 + loss_2).mean()
+#     return (loss_1 + loss_2).mean()
 
 class QNetwork(DeterministicMixin, Model):
 
@@ -54,13 +54,13 @@ class QNetwork(DeterministicMixin, Model):
                                                 nn.LeakyReLU()
                                             )
         self.classifier = nn.Sequential( 
-           nn.Conv2d(64, 64, kernel_size=3, stride=1),
+        #    nn.Conv2d(64, 64, kernel_size=3, stride=1),
            nn.LeakyReLU(),
            nn.Flatten(),
            nn.Linear(self.n_filters, 512),
            nn.Linear(512, self.num_actions)
         )
-        self.icnn = ICNN(64, 64, kernel_size=3, stride=1, padding=1, classifier=self.classifier, device=device)
+        self.icnn = ICNN(64, 64, kernel_size=3, stride=1, padding=0, classifier=self.classifier, device=device)
         
 
     def forward(self, inputs : torch.Tensor, targets=None, forward_pass='default'):
@@ -73,15 +73,14 @@ class QNetwork(DeterministicMixin, Model):
     #     x = torch.autograd.Variable(x, requires_grad=True)
     #     feat = self.backbone(x)
     #     return self.icnn(feat)
-        
 
     def compute(self, inputs, role):
-        x, x1, x2, loss_1, loss_2 = self.forward(inputs["states"])
+        x, x1, loss_1 = self.forward(inputs["states"])
         return x, {
             'x1': x1,
-            'x2': x2,
+            # 'x2': x2,
             'loss_1': loss_1,
-            'loss_2': loss_2
+            # 'loss_2': loss_2
         }
     
 # load and wrap the environment
@@ -115,13 +114,13 @@ for model in models.values():
 TOTAL_TIMESTEPS = int(5e6)
 
 cfg = DQN_DEFAULT_CONFIG.copy()
-#cfg["learning_starts"] = 80000
-cfg["learning_starts"] = 8000
+cfg["learning_starts"] = 80000
+# cfg["learning_starts"] = 8000
 cfg["learning_rate"] = 1e-4
 cfg["polyak"] = 1.0
 cfg["batch_size"] = 32
-cfg["polyak"] = 1.0
-cfg['additional_loss_hook'] = local_loss
+cfg["target_update_interval"] = 100000
+# cfg['additional_loss_hook'] = local_loss
 cfg["exploration"]["initial_epsilon"] = 1.0
 cfg["exploration"]["final_epsilon"] = 0.01
 cfg["exploration"]["timesteps"] = int(TOTAL_TIMESTEPS * 0.1)

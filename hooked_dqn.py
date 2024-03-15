@@ -75,7 +75,7 @@ class HookedDQN(DQN):
         if self._post_interaction_hook is not None:
             self._post_interaction_hook(timestep, timesteps)
 
-    def _update(self, timestep: int, timesteps: int) -> None:
+    def _update____(self, timestep: int, timesteps: int) -> None:
         """Algorithm's main update step
 
         :param timestep: Current timestep
@@ -105,19 +105,13 @@ class HookedDQN(DQN):
             q_values = torch.gather(full_q_values, dim=1, index=sampled_actions.long())
 
             q_network_loss = F.mse_loss(q_values, target_values)
-            q_network_loss += (info['loss_1'] + info['loss_2']).mean()
+            q_network_loss += info['loss_1'].mean()
 
             # optimize Q-network
             self.optimizer.zero_grad()
             q_network_loss.backward()
             self.optimizer.step()
 
-            # if self._additional_loss_hook is not None:
-                
-            #     addition_loss = self._additional_loss_hook(self, Variable(sampled_states.data, requires_grad=True), sampled_actions, sampled_rewards, Variable(sampled_next_states.data, requires_grad=True), sampled_dones)
-            #     self.optimizer.zero_grad()
-            #     addition_loss.backward()
-            #     self.optimizer.step()
 
             # update target network
             if not timestep % self._target_update_interval:

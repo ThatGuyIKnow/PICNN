@@ -49,10 +49,12 @@ class ICNN(nn.Module):
         return x_masked, selected_templates
 
     def compute_local_loss(self, x):
-        x = x.permute(1, 0, 2, 3)
-        exp_tr_x_T = (x[:, :, None, :, :] * self.templates_b[None, None, :, :, :]).sum(-1).sum(-1).exp()
-        Z_T = exp_tr_x_T.sum(1, keepdim=True)
-        p_x_T = exp_tr_x_T / Z_T
+        # x = x.permute(1, 0, 2, 3)
+        # exp_tr_x_T = (x[:, :, None, :, :] * self.templates_b[None, None, :, :, :]).sum(-1).sum(-1).exp()
+        # Z_T = exp_tr_x_T.sum(1, keepdim=True)
+        # p_x_T = exp_tr_x_T / Z_T
+        tr_x_T = torch.einsum('bcwh,twh->cbt', x, self.templates_b)
+        p_x_T = F.softmax(tr_x_T, dim=1)
 
         p_x = (self.p_T[None, None, :] * p_x_T).sum(-1)
         p_x_T_log = (p_x_T * torch.log(p_x_T/p_x[:, :, None])).sum(1)
@@ -62,13 +64,13 @@ class ICNN(nn.Module):
     def forward(self, x, train=True):
         x1, _ = self.get_masked_output(x)
         x = self.add_conv(x1)
-        x2, _ = self.get_masked_output(x)
+        # x2, _ = self.get_masked_output(x)
         
         
         x = self.classifier(x)
 
         # compute local loss:
         loss_1 = self.compute_local_loss(x1)
-        loss_2 = self.compute_local_loss(x2)
+        # loss_2 = self.compute_local_loss(x2)
 
-        return x, x1, x2, loss_1, loss_2
+        return x, x1, loss_1

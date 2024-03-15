@@ -34,7 +34,7 @@ class QNetwork(DeterministicMixin, Model):
         DeterministicMixin.__init__(self, clip_actions)
 
         self.n_classes = action_space.n
-        self.n_filters = 7 * 7 * 64
+        self.n_filters = 5184
         self.alpha = 1
         self.beta = -1
 
