@@ -114,7 +114,7 @@ for model in models.values():
 TOTAL_TIMESTEPS = int(2e6)
 
 cfg = DQN_DEFAULT_CONFIG.copy()
-cfg["learning_starts"] = 8000
+cfg["learning_starts"] = 80000
 # cfg["learning_starts"] = 8000
 cfg["learning_rate"] = 1e-4
 cfg["polyak"] = 1.0
