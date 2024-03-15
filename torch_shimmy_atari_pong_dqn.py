@@ -11,6 +11,7 @@ from skrl.models.torch import DeterministicMixin, Model
 from skrl.trainers.torch import SequentialTrainer
 from skrl.utils import set_seed
 
+from hooked_dqn import HookedDQN
 from icnn import ICNN
 
 
@@ -27,7 +28,11 @@ if torch.cuda.is_available():
 else:
   device = torch.device("cpu")
 
+def local_loss(agent, sampled_states, sampled_actions, sampled_rewards, sampled_next_states, sampled_dones):
+    _, _, _, loss_1, loss_2 = agent.target_q_network.forward_full(sampled_states)
+    _, _, _, loss_1, loss_2 = agent.target_q_network.forward_full(sampled_next_states)
 
+    return loss_1 + loss_2
 
 class QNetwork(DeterministicMixin, Model):
 
@@ -58,19 +63,21 @@ class QNetwork(DeterministicMixin, Model):
         self.icnn = ICNN(64, 64, kernel_size=3, stride=1, padding=1, classifier=self.classifier, device=device)
         
 
-
-        self.correlation = nn.Parameter(F.softmax(torch.rand(size=(self.n_classes, self.n_filters)), dim=0))
-
-
     def forward(self, inputs : torch.Tensor, targets=None, forward_pass='default'):
-        feat = self.backbone(inputs)
+        x = inputs.view(-1, 4, 84, 84) / 255.
+        feat = self.backbone(x)
         x = self.icnn(feat)
 
         return x[0]
         
+    def forward_full(self, inputs : torch.Tensor, targets=None, forward_pass='default'):
+        x = inputs.view(-1, 4, 84, 84) / 255.
+        feat = self.backbone(x)
+        return self.icnn(feat)
+        
 
     def compute(self, inputs, role):
-        return self.forward(inputs["states"].view(-1, 4, 84, 84) / 255.), {}
+        return self.forward(inputs["states"]), {}
     
 # load and wrap the environment
 env = gym.make("ALE/Pong-v5")
@@ -108,6 +115,7 @@ cfg["learning_rate"] = 1e-4
 cfg["polyak"] = 1.0
 cfg["batch_size"] = 32
 cfg["polyak"] = 1.0
+cfg['additional_loss_hook'] = local_loss
 cfg["exploration"]["initial_epsilon"] = 1.0
 cfg["exploration"]["final_epsilon"] = 0.01
 cfg["exploration"]["timesteps"] = int(TOTAL_TIMESTEPS * 0.1)
@@ -118,7 +126,7 @@ cfg["experiment"]["directory"] = "runs/torch/ALE_Pong"
 cfg["experiment"]["wandb"] = True
 cfg["experiment"]["wandb_kwargs"] = {'project': 'inv_dyn'}
 
-agent = DQN(models=models,
+agent = HookedDQN(models=models,
             memory=memory,
             cfg=cfg,
             observation_space=env.observation_space,
