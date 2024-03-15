@@ -106,7 +106,10 @@ class HookedDQN(DQN):
             q_network_loss = F.mse_loss(q_values, target_values)
 
             if self._additional_loss_hook is not None:
-                q_network_loss += self._additional_loss_hook(self, sampled_states, sampled_actions, sampled_rewards, sampled_next_states, sampled_dones)
+                addition_loss = self._additional_loss_hook(self, sampled_states, sampled_actions, sampled_rewards, sampled_next_states, sampled_dones)
+                self.optimizer.zero_grad()
+                addition_loss.backward()
+                self.optimizer.step()
 
             # optimize Q-network
             self.optimizer.zero_grad()
