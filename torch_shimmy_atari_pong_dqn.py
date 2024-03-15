@@ -111,7 +111,7 @@ for model in models.values():
 # configure and instantiate the agent (visit its documentation to see all the options)
 # https://skrl.readthedocs.io/en/latest/api/agents/dqn.html#configuration-and-hyperparameters
     
-TOTAL_TIMESTEPS = int(5e6)
+TOTAL_TIMESTEPS = int(2e6)
 
 cfg = DQN_DEFAULT_CONFIG.copy()
 cfg["learning_starts"] = 80000
