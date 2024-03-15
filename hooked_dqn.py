@@ -101,23 +101,23 @@ class HookedDQN(DQN):
                 target_values = sampled_rewards + self._discount_factor * sampled_dones.logical_not() * target_q_values
 
             # compute Q-network loss
-            
-            q_values = torch.gather(self.q_network.act({"states": sampled_states}, role="q_network")[0],
-                                    dim=1, index=sampled_actions.long())
+            full_q_values, _, info = self.q_network.act({"states": sampled_states}, role="q_network")
+            q_values = torch.gather(full_q_values, dim=1, index=sampled_actions.long())
 
             q_network_loss = F.mse_loss(q_values, target_values)
+            q_network_loss += (info['loss_1'] + info['loss_2']).mean()
 
             # optimize Q-network
             self.optimizer.zero_grad()
             q_network_loss.backward()
             self.optimizer.step()
 
-            if self._additional_loss_hook is not None:
+            # if self._additional_loss_hook is not None:
                 
-                addition_loss = self._additional_loss_hook(self, Variable(sampled_states.data, requires_grad=True), sampled_actions, sampled_rewards, Variable(sampled_next_states.data, requires_grad=True), sampled_dones)
-                self.optimizer.zero_grad()
-                addition_loss.backward()
-                self.optimizer.step()
+            #     addition_loss = self._additional_loss_hook(self, Variable(sampled_states.data, requires_grad=True), sampled_actions, sampled_rewards, Variable(sampled_next_states.data, requires_grad=True), sampled_dones)
+            #     self.optimizer.zero_grad()
+            #     addition_loss.backward()
+            #     self.optimizer.step()
 
             # update target network
             if not timestep % self._target_update_interval:

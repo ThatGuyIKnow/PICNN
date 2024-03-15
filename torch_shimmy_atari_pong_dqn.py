@@ -66,9 +66,7 @@ class QNetwork(DeterministicMixin, Model):
     def forward(self, inputs : torch.Tensor, targets=None, forward_pass='default'):
         x = inputs.view(-1, 4, 84, 84) / 255.
         feat = self.backbone(x)
-        x = self.icnn(feat)
-
-        return x
+        return self.icnn(feat)
         
     # def forward_full(self, inputs : torch.Tensor, targets=None, forward_pass='default'):
     #     x = inputs.view(-1, 4, 84, 84) / 255.
@@ -78,7 +76,13 @@ class QNetwork(DeterministicMixin, Model):
         
 
     def compute(self, inputs, role):
-        return self.forward(inputs["states"])[0], {}
+        x, x1, x2, loss_1, loss_2 = self.forward(inputs["states"])
+        return x, {
+            'x1': x1,
+            'x2': x2,
+            'loss_1': loss_1,
+            'loss_2': loss_2
+        }
     
 # load and wrap the environment
 env = gym.make("ALE/Pong-v5")
@@ -111,8 +115,8 @@ for model in models.values():
 TOTAL_TIMESTEPS = int(5e6)
 
 cfg = DQN_DEFAULT_CONFIG.copy()
-cfg["learning_starts"] = 80000
-# cfg["learning_starts"] = 8000
+#cfg["learning_starts"] = 80000
+cfg["learning_starts"] = 8000
 cfg["learning_rate"] = 1e-4
 cfg["polyak"] = 1.0
 cfg["batch_size"] = 32
