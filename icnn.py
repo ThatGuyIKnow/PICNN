@@ -40,7 +40,7 @@ class ICNN(ScriptModule):
     @script_method
     def get_masked_output(self, x: Tensor) -> Tuple[Tensor, Tensor]:
         indices = F.max_pool2d(x, self.out_size, return_indices=True)[1].squeeze()
-        selected_templates = torch.stack([self.templates_f[i] for i in indices], 0)
+        selected_templates = torch.stack([self.templates_f[i] for i in indices], dim=0)
         x_masked = F.relu(x * selected_templates)
         return x_masked, selected_templates
 
@@ -55,10 +55,13 @@ class ICNN(ScriptModule):
         return loss
 
     @script_method
-    def forward(self, x: Tensor, train: bool = True) -> Tuple[Tensor, Tensor, Tensor]:
+    def forward(self, x: Tensor, train: bool = True) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
         x1, _ = self.get_masked_output(x)
         x = self.add_conv(x1)
-        x = self.classifier(x)
+        x2, _ = self.get_masked_output(x)
+        x = self.classifier(x2)
 
         loss_1 = self.compute_local_loss(x1)
-        return x, x1, loss_1
+        loss_2 = self.compute_local_loss(x2)
+        return x, x1, x2, loss_1, loss_2
+    

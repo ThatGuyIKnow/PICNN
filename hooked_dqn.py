@@ -105,7 +105,7 @@ class HookedDQN(DQN):
             q_values = torch.gather(full_q_values, dim=1, index=sampled_actions.long())
 
             q_network_loss = F.mse_loss(q_values, target_values)
-            q_network_loss += info['loss_1'].mean()
+            q_network_loss += (info['loss_1'] + info['loss_2']).mean()
 
             # optimize Q-network
             self.optimizer.zero_grad()

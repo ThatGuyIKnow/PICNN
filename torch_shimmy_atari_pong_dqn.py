@@ -28,11 +28,11 @@ if torch.cuda.is_available():
 else:
   device = torch.device("cpu")
 
-# def local_loss(agent, sampled_states, sampled_actions, sampled_rewards, sampled_next_states, sampled_dones):
-#     _, _, _, loss_1, loss_2 = agent.target_q_network.forward(sampled_states)
-#     _, _, _, loss_1, loss_2 = agent.target_q_network.forward(sampled_next_states)
+def local_loss(agent, sampled_states, sampled_actions, sampled_rewards, sampled_next_states, sampled_dones):
+    _, _, _, loss_1, loss_2 = agent.target_q_network.forward(sampled_states)
+    _, _, _, loss_1, loss_2 = agent.target_q_network.forward(sampled_next_states)
 
-#     return (loss_1 + loss_2).mean()
+    return (loss_1 + loss_2).mean()
 
 class QNetwork(DeterministicMixin, Model):
 
@@ -41,7 +41,7 @@ class QNetwork(DeterministicMixin, Model):
         DeterministicMixin.__init__(self, clip_actions)
 
         self.n_classes = action_space.n
-        self.n_filters = 7 * 7 * 64
+        self.n_filters = 9 * 9 * 64
         self.alpha = 1
         self.beta = -1
 
@@ -60,7 +60,7 @@ class QNetwork(DeterministicMixin, Model):
            nn.Linear(self.n_filters, 512),
            nn.Linear(512, self.num_actions)
         )
-        self.icnn = ICNN(64, 64, kernel_size=3, stride=1, padding=0, classifier=self.classifier, device=device)
+        self.icnn = ICNN(64, 64, kernel_size=3, stride=1, padding=1, classifier=self.classifier, device=device)
         
 
     def forward(self, inputs : torch.Tensor, targets=None, forward_pass='default'):
@@ -75,12 +75,12 @@ class QNetwork(DeterministicMixin, Model):
     #     return self.icnn(feat)
 
     def compute(self, inputs, role):
-        x, x1, loss_1 = self.forward(inputs["states"])
+        x, x1, x2, loss_1, loss_2 = self.forward(inputs["states"])
         return x, {
             'x1': x1,
-            # 'x2': x2,
+            'x2': x2,
             'loss_1': loss_1,
-            # 'loss_2': loss_2
+            'loss_2': loss_2
         }
     
 # load and wrap the environment
@@ -125,7 +125,7 @@ cfg["exploration"]["initial_epsilon"] = 1.0
 cfg["exploration"]["final_epsilon"] = 0.01
 cfg["exploration"]["timesteps"] = int(TOTAL_TIMESTEPS * 0.1)
 # logging to TensorBoard and write checkpoints (in timesteps)
-cfg["experiment"]["write_interval"] = 1000
+cfg["experiment"]["write_interval"] = 100
 cfg["experiment"]["checkpoint_interval"] = 5000
 cfg["experiment"]["directory"] = "runs/torch/ALE_Pong"
 cfg["experiment"]["wandb"] = True
