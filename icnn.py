@@ -38,15 +38,34 @@ class ICNN(ScriptModule):
         self.p_T = torch.FloatTensor(p_T).requires_grad_(False).to(device)
 
     @script_method
+    def preprocess_x(self, x: Tensor) -> Tensor:
+        x = (x - x.min())
+        return (2 * (x / x.max()) - 1).abs()
+
+    @script_method
     def get_masked_output(self, x: Tensor) -> Tuple[Tensor, Tensor]:
-        indices = F.max_pool2d(x, self.out_size, return_indices=True)[1].squeeze()
+
+        # Reasoning. We see a clear uptick in the maximum reward the agent is able to achieve, that 
+        # is a lot greater than just random. By first normalizing the activation (-1, 1) and flipping it around 0,
+        # we will also activively punish the network for not templating NEGATIVE samples
+        
+        norm_x = self.preprocess_x(x)
+
+        indices = F.max_pool2d(norm_x, self.out_size, return_indices=True)[1].squeeze()
         selected_templates = torch.stack([self.templates_f[i] for i in indices], dim=0)
         x_masked = F.relu(x * selected_templates)
         return x_masked, selected_templates
 
     @script_method
-    def compute_local_loss(self, x: Tensor) -> Tensor:
-        tr_x_T = torch.einsum('bcwh,twh->cbt', x, self.templates_b)
+    def compute_local_loss(self, x: Tensor) -> Tensor:  
+
+        # Reasoning. We see a clear uptick in the maximum reward the agent is able to achieve, that 
+        # is a lot greater than just random. By first normalizing the activation (-1, 1) and flipping it around 0,
+        # we will also activively punish the network for not templating NEGATIVE samples
+
+        norm_x = self.preprocess_x(x)
+
+        tr_x_T = torch.einsum('bcwh,twh->cbt', norm_x, self.templates_b)
         p_x_T = F.softmax(tr_x_T, dim=1)
 
         p_x = (self.p_T[None, None, :] * p_x_T).sum(-1)
