@@ -128,8 +128,8 @@ cfg["exploration"]["timesteps"] = int(TOTAL_TIMESTEPS * 0.1)
 cfg["experiment"]["write_interval"] = 100
 cfg["experiment"]["checkpoint_interval"] = 5000
 cfg["experiment"]["directory"] = "runs/torch/ALE_Pong"
-# cfg["experiment"]["wandb"] = True
-# cfg["experiment"]["wandb_kwargs"] = {'project': 'inv_dyn'}
+cfg["experiment"]["wandb"] = True
+cfg["experiment"]["wandb_kwargs"] = {'project': 'inv_dyn'}
 
 agent = HookedDQN(models=models,
             memory=memory,
