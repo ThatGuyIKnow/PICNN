@@ -44,7 +44,8 @@ class ActionPredictor(L.LightningModule):
            nn.Flatten(),
            nn.LeakyReLU(),
            nn.Linear(64*9*9, 512),
-           nn.Linear(512, self.n_classes)
+           nn.Linear(512, self.n_classes),
+           nn.Softmax()
         )
         self.valid_acc = torchmetrics.classification.Accuracy(task="multiclass", num_classes=int(self.n_classes))
 
@@ -77,37 +78,49 @@ class ActionPredictor(L.LightningModule):
 
         actions = actions.squeeze()
         one_hot_actions = F.one_hot(actions, self.n_classes).to(torch.float32)
-        loss = F.mse_loss(x, one_hot_actions)
-        loss += loss_1.mean()
-        loss += loss_2.mean()
+        mse_loss = F.cross_entropy(x, one_hot_actions)
+        loss_1 = loss_1.mean()
+        loss_2 = loss_2.mean()
+        
+        loss = mse_loss + loss_1 + loss_2
 
         self.valid_acc(x.argmax(dim=-1), actions)
 
-        return loss
+        return loss, mse_loss, loss_1, loss_2
 
     def training_step(self, batch, batch_idx):
         
-        loss = self.step(batch, batch_idx)
+        loss, mse_loss, loss_1, loss_2 = self.step(batch, batch_idx)
         
         self.log("train_loss", loss)
+        self.log("train_mse_loss", mse_loss)
+        self.log("train_local_loss_1", loss_1)
+        self.log("train_local_loss_2", loss_2)
         return loss
 
 
     def validation_step(self, batch, batch_idx):
         
-        loss = self.step(batch, batch_idx)
-        self.log("val_loss", loss)
+        loss, mse_loss, loss_1, loss_2 = self.step(batch, batch_idx)
+        
+        self.log("valid_loss", loss)
+        self.log("valid_mse_loss", mse_loss)
+        self.log("valid_local_loss_1", loss_1)
+        self.log("valid_local_loss_2", loss_2)
 
-        self.log('train_acc', self.valid_acc, on_step=True, on_epoch=False)
+        self.log('valid_acc', self.valid_acc, on_step=True, on_epoch=False)
 
         return loss
 
 
     def test_step(self, batch, batch_idx):
         
-        loss = self.step(batch, batch_idx)
+        loss, mse_loss, loss_1, loss_2 = self.step(batch, batch_idx)
         
         self.log("test_loss", loss)
+        self.log("test_mse_loss", mse_loss)
+        self.log("test_local_loss_1", loss_1)
+        self.log("test_local_loss_2", loss_2)
 
         return loss
     
@@ -158,7 +171,7 @@ def train_action_predictor():
         callbacks=[
             ModelCheckpoint(save_weights_only=True, every_n_epochs=5),
             LearningRateMonitor("epoch"),
-            EarlyStopping(monitor='val_loss', mode='min', patience=EARLY_STOPPING_PATIENCE, check_on_train_epoch_end=False),
+            EarlyStopping(monitor='valid_acc', mode='max', patience=EARLY_STOPPING_PATIENCE, check_on_train_epoch_end=False),
         ],
         logger=wandb_logger,
         # gradient_clip_val=GRADIENT_CLIPPING_VAL
