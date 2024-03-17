@@ -6,11 +6,10 @@ from torch import Tensor
 from typing import Tuple
 
 class ICNN(ScriptModule):
-    def __init__(self, M: int, N: int, kernel_size: Tuple[int, int], stride: Tuple[int, int], padding: Tuple[int, int], classifier: nn.Module, norm_template: float = 1, device: torch.device = None):
+    def __init__(self, M: int, N: int, kernel_size: Tuple[int, int], stride: Tuple[int, int], padding: Tuple[int, int], out_size: int, norm_template: float = 1, device: torch.device = None):
         super(ICNN, self).__init__()
         self.add_conv = nn.Conv2d(in_channels=M, out_channels=N, kernel_size=kernel_size, stride=stride, padding=padding)
-        self.classifier = classifier
-        self.out_size = 9
+        self.out_size = out_size
 
         mus = torch.FloatTensor([[i, j] for i in range(self.out_size) for j in range(self.out_size)])
         templates = torch.zeros(mus.size(0), self.out_size, self.out_size)
@@ -45,27 +44,14 @@ class ICNN(ScriptModule):
     @script_method
     def get_masked_output(self, x: Tensor) -> Tuple[Tensor, Tensor]:
 
-        # Reasoning. We see a clear uptick in the maximum reward the agent is able to achieve, that 
-        # is a lot greater than just random. By first normalizing the activation (-1, 1) and flipping it around 0,
-        # we will also activively punish the network for not templating NEGATIVE samples
-        
-        norm_x = self.preprocess_x(x)
-
-        indices = F.max_pool2d(norm_x, self.out_size, return_indices=True)[1].squeeze()
+        indices = F.max_pool2d(x, self.out_size, return_indices=True)[1].squeeze()
         selected_templates = torch.stack([self.templates_f[i] for i in indices], dim=0)
         x_masked = F.relu(x * selected_templates)
         return x_masked, selected_templates
 
     @script_method
     def compute_local_loss(self, x: Tensor) -> Tensor:  
-
-        # Reasoning. We see a clear uptick in the maximum reward the agent is able to achieve, that 
-        # is a lot greater than just random. By first normalizing the activation (-1, 1) and flipping it around 0,
-        # we will also activively punish the network for not templating NEGATIVE samples
-
-        norm_x = self.preprocess_x(x)
-
-        tr_x_T = torch.einsum('bcwh,twh->cbt', norm_x, self.templates_b)
+        tr_x_T = torch.einsum('bcwh,twh->cbt', x, self.templates_b)
         p_x_T = F.softmax(tr_x_T, dim=1)
 
         p_x = (self.p_T[None, None, :] * p_x_T).sum(-1)
@@ -74,13 +60,12 @@ class ICNN(ScriptModule):
         return loss
 
     @script_method
-    def forward(self, x: Tensor, train: bool = True) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+    def forward(self, x: Tensor, train: bool = True) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
         x1, _ = self.get_masked_output(x)
         x = self.add_conv(x1)
         x2, _ = self.get_masked_output(x)
-        x = self.classifier(x2)
 
         loss_1 = self.compute_local_loss(x1)
         loss_2 = self.compute_local_loss(x2)
-        return x, x1, x2, loss_1, loss_2
+        return x1, x2, loss_1, loss_2
     

@@ -105,8 +105,9 @@ class HookedDQN(DQN):
             q_values = torch.gather(full_q_values, dim=1, index=sampled_actions.long())
 
             q_network_loss = F.mse_loss(q_values, target_values)
-            q_network_loss += (info['loss_1'] + info['loss_2']).mean()
+            localized_loss = (info['loss_1'] + info['loss_2']).mean()
 
+            q_network_loss += localized_loss
             # optimize Q-network
             self.optimizer.zero_grad()
             q_network_loss.backward()
@@ -123,6 +124,7 @@ class HookedDQN(DQN):
 
             # record data
             self.track_data("Loss / Q-network loss", q_network_loss.item())
+            self.track_data("Loss / Localized loss", localized_loss.item())
 
             self.track_data("Target / Target (max)", torch.max(target_values).item())
             self.track_data("Target / Target (min)", torch.min(target_values).item())

@@ -60,13 +60,15 @@ class QNetwork(DeterministicMixin, Model):
            nn.Linear(self.n_filters, 512),
            nn.Linear(512, self.num_actions)
         )
-        self.icnn = ICNN(64, 64, kernel_size=3, stride=1, padding=1, classifier=self.classifier, device=device)
+        self.icnn = ICNN(64, 64, kernel_size=3, stride=1, padding=1, device=device)
         
 
     def forward(self, inputs : torch.Tensor, targets=None, forward_pass='default'):
         x = inputs.view(-1, 4, 84, 84) / 255.
         feat = self.backbone(x)
-        return self.icnn(feat)
+        x1, x2, loss_1, loss_2 = self.icnn(feat)
+        x = self.classifier(x2)
+        return x, x1, x2, loss_1, loss_2
         
     # def forward_full(self, inputs : torch.Tensor, targets=None, forward_pass='default'):
     #     x = inputs.view(-1, 4, 84, 84) / 255.
