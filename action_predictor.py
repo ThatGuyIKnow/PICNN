@@ -36,9 +36,9 @@ class ActionPredictor(L.LightningModule):
         self.n_classes = action_space.n
         self.n_filters = 9 * 9 * 64
         self.backbone = nn.Sequential(nn.Conv2d(1, 32, stride=4, kernel_size=8))
-        self.icnn = ICNN(32, 64, kernel_size=3, stride=1, padding=1, out_size=20, device=device)
+        self.icnn = ICNN(32, 32, kernel_size=3, stride=1, padding=1, out_size=20, device=device)
         self.cnn = nn.Sequential(
-           nn.Conv2d(64, 64, kernel_size=3, stride=2),
+           nn.Conv2d(32, 64, kernel_size=3, stride=2),
            nn.LeakyReLU(),)
         self.classifier = nn.Sequential( 
            nn.Flatten(),
@@ -54,7 +54,7 @@ class ActionPredictor(L.LightningModule):
         # Using a scheduler is optional but can be helpful.
         # The scheduler reduces the LR if the validation performance hasn't improved for the last N epochs
         scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5)
-        return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "val_loss"}
+        return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "valid_loss"}
     
 
     def forward(self, states : torch.Tensor, next_states: torch.Tensor):
@@ -92,10 +92,10 @@ class ActionPredictor(L.LightningModule):
         
         loss, ce_loss, loss_1, loss_2 = self.step(batch, batch_idx)
         
-        self.log("train_loss", loss, on_step=True)
-        self.log("train_ce_loss", ce_loss, on_step=True)
-        self.log("train_local_loss_1", loss_1, on_step=True)
-        self.log("train_local_loss_2", loss_2, on_step=True)
+        self.log("train_loss", loss, on_step=True, on_epoch=False)
+        self.log("train_ce_loss", ce_loss, on_step=True, on_epoch=False)
+        self.log("train_local_loss_1", loss_1, on_step=True, on_epoch=False)
+        self.log("train_local_loss_2", loss_2, on_step=True, on_epoch=False)
         return loss
 
 
@@ -108,7 +108,7 @@ class ActionPredictor(L.LightningModule):
         self.log("valid_local_loss_1", loss_1)
         self.log("valid_local_loss_2", loss_2)
 
-        self.log('valid_acc', self.valid_acc, on_step=True, on_epoch=False)
+        self.log('valid_acc', self.valid_acc)
 
         return loss
 
@@ -173,7 +173,7 @@ def train_action_predictor():
             LearningRateMonitor("epoch"),
             EarlyStopping(monitor='valid_acc', mode='max', patience=EARLY_STOPPING_PATIENCE, check_on_train_epoch_end=False),
         ],
-        # logger=wandb_logger,
+        logger=wandb_logger,
         # gradient_clip_val=GRADIENT_CLIPPING_VAL
     )
     trainer.logger._log_graph = True
