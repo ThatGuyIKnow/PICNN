@@ -4,6 +4,8 @@ import gymnasium as gym
 import torch
 from torch.utils.data import Dataset
 
+import numpy as np
+
 class EpisodeDataset(Dataset):
     def __init__(self, env_fn, num_envs=4, max_steps=1000, episodes_per_epoch=2, skip_first=0, repeat_action=1, device='cpu'):
         self.env_fn = env_fn
@@ -43,7 +45,7 @@ class EpisodeDataset(Dataset):
             if any(ds) or any(truncated):
                 break
         
-        states = torch.tensor(states).to(self.device)
+        states = torch.tensor(np.array(states)).to(self.device)
         actions = torch.tensor(actions).to(self.device)
         rewards = torch.tensor(rewards).to(self.device)
         next_states = torch.tensor(next_states).to(self.device)

@@ -3,6 +3,7 @@ import gymnasium as gym
 
 import torch
 import torch.nn as nn
+import torchmetrics
 
 from EpisodeDataset import EpisodeDataset
 from icnn import ICNN
@@ -45,6 +46,7 @@ class ActionPredictor(L.LightningModule):
            nn.Linear(64*9*9, 512),
            nn.Linear(512, self.n_classes)
         )
+        self.valid_acc = torchmetrics.classification.Accuracy(task="multiclass", num_classes=self.n_classes)
 
     def configure_optimizers(self):
         optimizer = Adam(self.parameters())
@@ -78,6 +80,8 @@ class ActionPredictor(L.LightningModule):
         loss += loss_1.mean()
         loss += loss_2.mean()
 
+        self.valid_acc(x, one_hot_actions)
+
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -91,8 +95,9 @@ class ActionPredictor(L.LightningModule):
     def validation_step(self, batch, batch_idx):
         
         loss = self.step(batch, batch_idx)
-        
         self.log("val_loss", loss)
+
+        self.log('train_acc', self.valid_acc, on_step=True, on_epoch=False)
 
         return loss
 
