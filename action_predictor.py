@@ -34,16 +34,18 @@ class ActionPredictor(L.LightningModule):
         self.save_hyperparameters()
 
         self.n_classes = action_space.n
-        self.n_filters = 9 * 9 * 64
+        self.n_filters = 3 * 3 * 64
         self.backbone = nn.Sequential(nn.Conv2d(1, 32, stride=4, kernel_size=8))
         self.icnn = ICNN(32, 32, kernel_size=3, stride=1, padding=1, out_size=20, device=device)
         self.cnn = nn.Sequential(
-           nn.Conv2d(32, 64, kernel_size=3, stride=2),
+           nn.Conv2d(32, 64, kernel_size=4, stride=2),
+           nn.LeakyReLU(),
+           nn.Conv2d(64, 64, kernel_size=4, stride=2),
            nn.LeakyReLU(),)
         self.classifier = nn.Sequential( 
            nn.Flatten(),
            nn.LeakyReLU(),
-           nn.Linear(64*9*9, 512),
+           nn.Linear(self.n_filters*2, 512),
            nn.Linear(512, self.n_classes),
            nn.Softmax()
         )
@@ -63,7 +65,8 @@ class ActionPredictor(L.LightningModule):
         x = self.backbone(x)
         x1, x2, loss_1, loss_2 = self.icnn(x)
         x = self.cnn(x2)
-        x = x.view(2, -1, 64, 9, 9).sum(dim=0)
+        x = x.view(2, -1, 64, 3, 3)
+        x = torch.concat([x[0], x[1]], dim=1)
         x = self.classifier(x)
         return x, loss_1, loss_2
     
