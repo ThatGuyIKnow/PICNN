@@ -46,7 +46,7 @@ class ActionPredictor(L.LightningModule):
            nn.Linear(64*9*9, 512),
            nn.Linear(512, self.n_classes)
         )
-        self.valid_acc = torchmetrics.classification.Accuracy(task="multiclass", num_classes=self.n_classes)
+        self.valid_acc = torchmetrics.classification.Accuracy(task="multiclass", num_classes=int(self.n_classes))
 
     def configure_optimizers(self):
         optimizer = Adam(self.parameters())
