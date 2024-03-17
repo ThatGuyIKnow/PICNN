@@ -155,7 +155,7 @@ def train_action_predictor():
         devices=1,
         max_epochs=MAX_EPOCHS,
         callbacks=[
-            ModelCheckpoint(save_weights_only=True),
+            ModelCheckpoint(save_weights_only=True, every_n_epochs=5),
             LearningRateMonitor("epoch"),
             EarlyStopping(monitor='val_loss', mode='min', patience=EARLY_STOPPING_PATIENCE, check_on_train_epoch_end=False),
         ],
