@@ -75,12 +75,13 @@ class ActionPredictor(L.LightningModule):
         states, actions, _,_, next_states = batch
         x, loss_1, loss_2 = self.forward(states, next_states)
 
-        one_hot_actions = F.one_hot(actions.squeeze(), self.n_classes).to(torch.float32)
+        actions = actions.squeeze()
+        one_hot_actions = F.one_hot(actions, self.n_classes).to(torch.float32)
         loss = F.mse_loss(x, one_hot_actions)
         loss += loss_1.mean()
         loss += loss_2.mean()
 
-        self.valid_acc(x, one_hot_actions)
+        self.valid_acc(x.argmax(dim=-1), actions)
 
         return loss
 
