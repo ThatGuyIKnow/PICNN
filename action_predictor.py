@@ -216,7 +216,7 @@ def train_action_predictor():
             LearningRateMonitor("epoch"),
             EarlyStopping(monitor='valid_loss', mode='min', patience=EARLY_STOPPING_PATIENCE, check_on_train_epoch_end=False),
         ],
-        # logger=wandb_logger,
+        logger=wandb_logger,
         # gradient_clip_val=GRADIENT_CLIPPING_VAL
     )
     trainer.logger._log_graph = True
