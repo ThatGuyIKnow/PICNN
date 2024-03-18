@@ -2,3 +2,4 @@ runs
 wandb
 *.0
 *.pyc
+*.ckpt
