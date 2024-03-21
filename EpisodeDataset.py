@@ -63,12 +63,12 @@ class EpisodeDataset(Dataset):
 
     def __getitem__(self, idx):
         # Convert numpy arrays to tensors
-        state = torch.tensor(self.states[idx], dtype=torch.float, device=self.device)
+        state = torch.tensor(self.states[idx], dtype=torch.float, device=self.device, requires_grad=True)
         action = torch.tensor(self.actions[idx], dtype=torch.long, device=self.device)
-        action = F.one_hot(action, self.n_classes).to(torch.float32)
-        reward = torch.tensor(self.rewards[idx], dtype=torch.float, device=self.device)
-        next_state = torch.tensor(self.next_states[idx], dtype=torch.float, device=self.device)
-        done = torch.tensor(self.dones[idx], dtype=torch.float, device=self.device)
+        action = F.one_hot(action, self.n_classes).to(torch.float32).requires_grad_()
+        reward = torch.tensor(self.rewards[idx], dtype=torch.float, device=self.device, requires_grad=True)
+        next_state = torch.tensor(self.next_states[idx], dtype=torch.float, device=self.device, requires_grad=True)
+        done = torch.tensor(self.dones[idx], dtype=torch.float, device=self.device, requires_grad=True)
 
         return state, action, reward, done, next_state
 

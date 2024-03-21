@@ -6,9 +6,18 @@ from torch import Tensor
 from typing import Tuple
 
 class ICNN(ScriptModule):
-    def __init__(self, M: int, N: int, kernel_size: Tuple[int, int], stride: Tuple[int, int], padding: Tuple[int, int], out_size: int, norm_template: float = 1, device: torch.device = None):
+    def __init__(self, 
+                 M: int, 
+                 N: int, 
+                 kernel_size: Tuple[int, int], 
+                 stride: Tuple[int, int], 
+                 padding: Tuple[int, int], 
+                 out_size: int, 
+                 groups: int = 1,
+                 norm_template: float = 1, 
+                 device: torch.device = None):
         super(ICNN, self).__init__()
-        self.add_conv = nn.Conv2d(in_channels=M, out_channels=N, kernel_size=kernel_size, stride=stride, padding=padding)
+        self.add_conv = nn.Conv2d(in_channels=M, out_channels=N, kernel_size=kernel_size, groups=groups, stride=stride, padding=padding)
         self.out_size = out_size
 
         mus = torch.FloatTensor([[i, j] for i in range(self.out_size) for j in range(self.out_size)])
@@ -37,11 +46,6 @@ class ICNN(ScriptModule):
         self.p_T = torch.FloatTensor(p_T).requires_grad_(False).to(device)
 
     @script_method
-    def preprocess_x(self, x: Tensor) -> Tensor:
-        x = (x - x.min())
-        return (2 * (x / x.max()) - 1).abs()
-
-    @script_method
     def get_masked_output(self, x: Tensor) -> Tuple[Tensor, Tensor]:
 
         indices = F.max_pool2d(x, self.out_size, return_indices=True)[1].squeeze()
@@ -61,11 +65,15 @@ class ICNN(ScriptModule):
 
     @script_method
     def forward(self, x: Tensor, train: bool = True) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
-        x1, _ = self.get_masked_output(x)
+        x1, _ = self.get_masked_output(x) 
+        # x1 *= x
         x = self.add_conv(x1)
         x2, _ = self.get_masked_output(x)
+        # x2 *= x
+
+        x = x2
 
         loss_1 = self.compute_local_loss(x1)
         loss_2 = self.compute_local_loss(x2)
-        return x1, x2, loss_1, loss_2
+        return x, loss_1, loss_2
     

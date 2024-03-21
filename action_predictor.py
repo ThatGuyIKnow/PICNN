@@ -3,6 +3,9 @@ from types import ModuleType
 from typing import Sequence, Tuple
 import gymnasium as gym
 
+from sklearn.metrics import classification_report
+from sklearn.neural_network import MLPClassifier
+from sklearn.svm import SVC
 import torch
 import torch.nn as nn
 import torchmetrics
@@ -158,7 +161,7 @@ class ActionPredictor(L.LightningModule):
 
 
     def configure_optimizers(self):
-        optimizer = Adam(self.parameters(), lr=1e-3)
+        optimizer = Adam(self.parameters(), lr=1e-4)
         # Using a scheduler is optional but can be helpful.
         # The scheduler reduces the LR if the validation performance hasn't improved for the last N epochs
         scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5)
@@ -242,8 +245,9 @@ class LogisticRegression(L.LightningModule):
     def __init__(self, n_inputs, n_outputs):
         super(LogisticRegression, self).__init__()
         self.linear = nn.Sequential(
-            torch.nn.Linear(n_inputs, 512),
-            torch.nn.Linear(512, n_outputs)
+            torch.nn.Linear(n_inputs, 64),
+            torch.nn.ReLU(),
+            torch.nn.Linear(64, n_outputs)
         )
         self.loss_fn = nn.CrossEntropyLoss()
 
@@ -254,18 +258,30 @@ class LogisticRegression(L.LightningModule):
     
 
     def configure_optimizers(self):
-        optimizer = Adam(self.parameters(), lr=1e-3)
+        optimizer = Adam(self.parameters(), lr=1e-3 )
         # Using a scheduler is optional but can be helpful.
         # The scheduler reduces the LR if the validation performance hasn't improved for the last N epochs
         scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=5)
-        return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "train_loss"}
+        return {"optimizer": optimizer, 
+                "lr_scheduler": scheduler, 
+                "monitor": "train_loss"
+                }
     
     def training_step(self, batch, batch_idx):
         states, actions, _,_, next_states = batch
+
+        states = states[:,::2,-9]
+        next_states = next_states[:,::2,-9]
+
         x = torch.stack([states, next_states], dim=1).flatten(start_dim=1)
-        pred = self.forward(x)
+        pred = self.forward(states - next_states)
         loss = self.loss_fn(pred, actions)
+
+        acc = torchmetrics.functional.accuracy(pred.argmax(dim=-1), actions.argmax(dim=-1), task='multiclass', num_classes=int(6), average='none')
+
         self.log("train_loss", loss, on_step=True, on_epoch=False)
+        self.log_dict({f'train_acc.{i}': a for i, a in enumerate(acc)})
+
         
         return {'loss': loss, 'preds': pred}
 # load and wrap the environment
@@ -300,13 +316,13 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 def train_action_predictor():
-    env_fn = lambda: gym.wrappers.AtariPreprocessing(gym.make("ALE/Pong-v5"), frame_skip=1, screen_size=84)
+    env_fn = lambda: gym.wrappers.ResizeObservation(gym.wrappers.GrayScaleObservation(gym.make("PongDeterministic-v4")), shape=(84,84))
 
-    train_data = EpisodeDataset(env_fn, num_envs=4, max_steps=300, episodes_per_epoch=1000, skip_first=0, repeat_action=1, device=DEVICE)
+    train_data = EpisodeDataset(env_fn, num_envs=4, max_steps=3, episodes_per_epoch=10000, skip_first=0, repeat_action=100, device=DEVICE)
     #val_data = EpisodeDataset(env_fn, num_envs=1, max_steps=100, episodes_per_epoch=10, skip_first=0, repeat_action=1, device=DEVICE)
 
 
-    train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
+    train_loader = DataLoader(train_data, batch_size=16, shuffle=True)
     #val_loader = DataLoader(val_data, batch_size=64, shuffle=False)
 
 
@@ -323,7 +339,7 @@ def train_action_predictor():
             LearningRateMonitor("epoch"),
             EarlyStopping(monitor='valid_loss', mode='min', patience=EARLY_STOPPING_PATIENCE, check_on_train_epoch_end=False),
         ],
-        logger=wandb_logger,
+        # logger=wandb_logger,
         # gradient_clip_val=GRADIENT_CLIPPING_VAL
     )
     trainer.logger._log_graph = True
@@ -336,7 +352,7 @@ def train_action_predictor():
         model = ActionPredictor.load_from_checkpoint(pretrained_filename)
     else:
         # model = ActionPredictor(image_size=(84, 84), channels_multiplier=12)
-        model = LogisticRegression(84*84*2, 6)
+        model = LogisticRegression(42, 6)
         trainer.fit(model, train_loader)
     
     # Test best model on validation and test set
@@ -344,4 +360,47 @@ def train_action_predictor():
     result = {"val": val_result}
     return model, result
 
-train_action_predictor()
+# train_action_predictor()
+
+
+
+env_fn = lambda: gym.wrappers.ResizeObservation(gym.wrappers.GrayScaleObservation(gym.make("PongDeterministic-v4")), shape=(84,84))
+
+train_data = EpisodeDataset(env_fn, num_envs=4, max_steps=100, episodes_per_epoch=100, skip_first=10, repeat_action=1, device=DEVICE)
+#val_data = EpisodeDataset(env_fn, num_envs=1, max_steps=100, episodes_per_epoch=10, skip_first=0, repeat_action=1, device=DEVICE)
+
+
+train_loader = DataLoader(train_data, batch_size=16, shuffle=True)
+#val_loader = DataLoader(val_data, batch_size=64, shuffle=False)
+
+y = []
+X = []
+
+
+for i in range(len(train_data)):
+    d = train_data[i]
+    states, action, reward, done, next_states = d
+    states = states.flatten().detach().numpy()
+    next_states = next_states.flatten().detach().numpy()
+    action = action.detach().numpy()
+
+    X.append(states - next_states)
+    y.append(action)
+
+X = np.stack(X, axis=0)
+y = np.stack(y, axis=0).argmax(axis=-1)
+
+
+def gen(load):
+    it = load._get_iterator()
+    for d in it:
+        state, action, reward, done, next_state = d
+        states = state.detach().numpy()
+        next_states = next_state[:,::2,-9].detach().numpy()
+        action = action.detach().numpy()
+        yield (states - next_states, action)
+
+
+clf = MLPClassifier().fit(X, y)
+
+print(classification_report(y, clf.predict(X)))

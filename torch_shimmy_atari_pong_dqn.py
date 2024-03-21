@@ -60,7 +60,9 @@ class QNetwork(DeterministicMixin, Model):
            nn.Linear(self.n_filters, 512),
            nn.Linear(512, self.num_actions)
         )
-        self.icnn = ICNN(64, 64, kernel_size=3, stride=1, padding=1, device=device)
+        
+
+        self.icnn = ICNN(64, 64, kernel_size=3, stride=1, padding=1, out_size=9, device=device)
         
 
     def forward(self, inputs : torch.Tensor, targets=None, forward_pass='default'):
